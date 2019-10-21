@@ -38,11 +38,10 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
 
     for x in 1..ltz {
         let l = 1 << x;
-        let tmp = len >> (x + 1);
 
         current.par_iter_mut().enumerate().for_each(|(i, b)| {
             if (i / l) & 1 == 1 {
-                let idx = (i % l) * tmp;
+                let idx = (i % l) << (ltz - x - 1);
                 let weight = unsafe { w.get_unchecked(idx) };
                 *b = *b * weight;
             }
