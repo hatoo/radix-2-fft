@@ -36,15 +36,22 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
     for x in 1..len.trailing_zeros() {
         let l = 1 << x;
         let tmp = len >> (x + 1);
+
+        buf.par_iter_mut().enumerate().for_each(|(i, b)| {
+            if (i / l) & 1 == 1 {
+                let idx = (i % l) * tmp;
+                let weight = *unsafe { w.get_unchecked(idx) };
+                *b = *b * weight;
+            }
+        });
+
         buf = (0..len)
             .into_par_iter()
             .map(|i| {
-                let idx = (i * tmp) % len;
-                let weight = *unsafe { w.get_unchecked(idx) };
                 if (i / l) & 1 == 0 {
-                    *unsafe { buf.get_unchecked(i) } + weight * *unsafe { buf.get_unchecked(i + l) }
+                    *unsafe { buf.get_unchecked(i) } + *unsafe { buf.get_unchecked(i + l) }
                 } else {
-                    weight * *unsafe { buf.get_unchecked(i) } + *unsafe { buf.get_unchecked(i - l) }
+                    -*unsafe { buf.get_unchecked(i) } + *unsafe { buf.get_unchecked(i - l) }
                 }
             })
             .collect();
