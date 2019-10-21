@@ -18,46 +18,51 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
 
     let ltz = len.trailing_zeros();
     // Step 1
-    let mut buf: Vec<Complex<T>> = (0..len)
+    let buf: Vec<Complex<T>> = (0..len)
         .into_par_iter()
         .map(|i| {
             if i & 1 == 0 {
                 let fi = i.reverse_bits().rotate_left(ltz);
                 let fi1 = (i + 1).reverse_bits().rotate_left(ltz);
-                *unsafe { array.get_unchecked(fi) } + *unsafe { array.get_unchecked(fi1) }
+                *unsafe { array.get_unchecked(fi) } + unsafe { array.get_unchecked(fi1) }
             } else {
                 let fi_1 = (i - 1).reverse_bits().rotate_left(ltz);
                 let fi = i.reverse_bits().rotate_left(ltz);
-                *unsafe { array.get_unchecked(fi_1) } - *unsafe { array.get_unchecked(fi) }
+                *unsafe { array.get_unchecked(fi_1) } - unsafe { array.get_unchecked(fi) }
             }
         })
         .collect();
+
+    let mut current = buf;
+    let mut swap = Vec::with_capacity(len);
 
     for x in 1..ltz {
         let l = 1 << x;
         let tmp = len >> (x + 1);
 
-        buf.par_iter_mut().enumerate().for_each(|(i, b)| {
+        current.par_iter_mut().enumerate().for_each(|(i, b)| {
             if (i / l) & 1 == 1 {
                 let idx = (i % l) * tmp;
-                let weight = *unsafe { w.get_unchecked(idx) };
+                let weight = unsafe { w.get_unchecked(idx) };
                 *b = *b * weight;
             }
         });
 
-        buf = (0..len)
+        (0..len)
             .into_par_iter()
             .map(|i| {
                 if (i / l) & 1 == 0 {
-                    *unsafe { buf.get_unchecked(i) } + *unsafe { buf.get_unchecked(i + l) }
+                    *unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i + l) }
                 } else {
-                    -*unsafe { buf.get_unchecked(i) } + *unsafe { buf.get_unchecked(i - l) }
+                    -*unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i - l) }
                 }
             })
-            .collect();
+            .collect_into_vec(&mut swap);
+
+        std::mem::swap(&mut current, &mut swap);
     }
 
-    buf
+    current
 }
 
 #[cfg(test)]
