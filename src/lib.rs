@@ -33,7 +33,7 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
         })
         .collect();
 
-    for x in 1..len.trailing_zeros() {
+    for x in 1..ltz {
         let l = 1 << x;
         let tmp = len >> (x + 1);
 
