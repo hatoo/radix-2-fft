@@ -36,6 +36,10 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
     let mut current = buf;
     let mut swap = Vec::with_capacity(len);
 
+    unsafe {
+        swap.set_len(len);
+    }
+
     for x in 1..ltz {
         let l = 1 << x;
 
@@ -47,16 +51,13 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
             }
         });
 
-        (0..len)
-            .into_par_iter()
-            .map(|i| {
-                if (i / l) & 1 == 0 {
-                    *unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i + l) }
-                } else {
-                    *unsafe { current.get_unchecked(i - l) } - unsafe { current.get_unchecked(i) }
-                }
-            })
-            .collect_into_vec(&mut swap);
+        swap.par_iter_mut().enumerate().for_each(|(i, v)| {
+            *v = if (i / l) & 1 == 0 {
+                *unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i + l) }
+            } else {
+                *unsafe { current.get_unchecked(i - l) } - unsafe { current.get_unchecked(i) }
+            };
+        });
 
         std::mem::swap(&mut current, &mut swap);
     }
