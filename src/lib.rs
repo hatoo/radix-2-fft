@@ -21,14 +21,22 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
     let buf: Vec<Complex<T>> = (0..len)
         .into_par_iter()
         .map(|i| {
-            if i & 1 == 0 {
+            let v = if i & 1 == 0 {
                 let fi = i.reverse_bits().rotate_left(ltz);
                 let fi1 = (i | 1).reverse_bits().rotate_left(ltz);
                 *unsafe { array.get_unchecked(fi) } + unsafe { array.get_unchecked(fi1) }
             } else {
                 let fi = i.reverse_bits().rotate_left(ltz);
                 let fi_1 = (i ^ 1).reverse_bits().rotate_left(ltz);
-                *unsafe { array.get_unchecked(fi_1) } - unsafe { array.get_unchecked(fi) }
+
+                (*unsafe { array.get_unchecked(fi_1) } - unsafe { array.get_unchecked(fi) })
+            };
+            if (i >> 1) & 1 == 1 {
+                let idx = (i & 1) << (ltz - 2);
+                let weight = unsafe { w.get_unchecked(idx) };
+                v * weight
+            } else {
+                v
             }
         })
         .collect();
@@ -39,21 +47,34 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
     for x in 1..ltz {
         let l = 1 << x;
 
-        current.par_iter_mut().enumerate().for_each(|(i, b)| {
-            if (i / l) & 1 == 1 {
-                let idx = (i % l) << (ltz - x - 1);
-                let weight = unsafe { w.get_unchecked(idx) };
-                *b = *b * weight;
-            }
-        });
+        /*
+        if x != 1 {
+            current.par_iter_mut().enumerate().for_each(|(i, b)| {
+                if (i / l) & 1 == 1 {
+                    let idx = (i % l) << (ltz - x - 1);
+                    let weight = unsafe { w.get_unchecked(idx) };
+                    *b = *b * weight;
+                }
+            });
+        }
+        */
 
         (0..len)
             .into_par_iter()
             .map(|i| {
-                if (i / l) & 1 == 0 {
+                let v = if (i / l) & 1 == 0 {
                     *unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i + l) }
                 } else {
                     -*unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i - l) }
+                };
+
+                if x != ltz - 1 && (i / (l << 1)) & 1 == 1 {
+                    let idx = (i % (l << 1)) << (ltz - x - 2);
+                    let weight = unsafe { w.get_unchecked(idx) };
+
+                    v * weight
+                } else {
+                    v
                 }
             })
             .collect_into_vec(&mut swap);
