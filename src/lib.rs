@@ -53,7 +53,7 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
                 if (i / l) & 1 == 0 {
                     *unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i + l) }
                 } else {
-                    -*unsafe { current.get_unchecked(i) } + unsafe { current.get_unchecked(i - l) }
+                    *unsafe { current.get_unchecked(i - l) } - unsafe { current.get_unchecked(i) }
                 }
             })
             .collect_into_vec(&mut swap);
