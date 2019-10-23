@@ -23,11 +23,11 @@ pub fn fft<T: Float + FloatConst + Send + Sync>(array: &[Complex<T>]) -> Vec<Com
         .map(|i| {
             if i & 1 == 0 {
                 let fi = i.reverse_bits().rotate_left(ltz);
-                let fi1 = (i + 1).reverse_bits().rotate_left(ltz);
+                let fi1 = (i | 1).reverse_bits().rotate_left(ltz);
                 *unsafe { array.get_unchecked(fi) } + unsafe { array.get_unchecked(fi1) }
             } else {
-                let fi_1 = (i - 1).reverse_bits().rotate_left(ltz);
                 let fi = i.reverse_bits().rotate_left(ltz);
+                let fi_1 = (i ^ 1).reverse_bits().rotate_left(ltz);
                 *unsafe { array.get_unchecked(fi_1) } - unsafe { array.get_unchecked(fi) }
             }
         })
